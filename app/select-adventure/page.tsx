@@ -3,9 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const languages = ['Português', 'English', 'Español', 'Français', 'Deutsch', 'Italiano', 'Nederlands', 'Polski', 'Русский', 'Čeština', 'Slovenčina']
-
-const adventureTypes = ['Cyberpunk', 'Crime', 'Fantasia', 'Sci-Fi', 'História']
+const adventureTypes = ['Cyberpunk', 'Fantasia', 'Sci-Fi', 'Terror']
+const languages = ['Português', 'Inglês', 'Espanhol', 'Francês', 'Alemão']
 
 export default function SelectAdventure() {
   const [adventureType, setAdventureType] = useState('')
@@ -70,9 +69,9 @@ export default function SelectAdventure() {
         
         <button 
           onClick={handleStartGame}
-          className="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-4 rounded transition duration-300"
+          className="w-full bg-cyan-500 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded transition duration-300"
         >
-          Iniciar Jogo
+          Iniciar Aventura
         </button>
       </div>
     </div>

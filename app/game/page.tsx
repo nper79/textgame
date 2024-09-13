@@ -15,7 +15,7 @@ export default function Game() {
   const [currentOptions, setCurrentOptions] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [customAction, setCustomAction] = useState('')
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const adventureType = searchParams.get('type') || 'Fantasy'
   const storyLanguage = searchParams.get('story') || 'English'
@@ -26,7 +26,9 @@ export default function Game() {
   }, [])
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
   }, [scenarioHistory])
 
   const fetchScenario = async (action?: string) => {
@@ -105,10 +107,12 @@ export default function Game() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
-      <h1 className="text-3xl font-bold p-4 text-cyan-400">{adventureType} Adventure</h1>
-      <div className="flex-grow flex flex-col">
-        <div className="flex-grow overflow-y-auto p-4">
+    <div className="min-h-screen bg-cover bg-center flex items-center justify-center p-4" style={{backgroundImage: "url('/images/cyberbackground.webp')"}}>
+      <div className="bg-black bg-opacity-70 text-white p-8 rounded-lg shadow-lg max-w-3xl w-full flex flex-col h-[80vh]">
+        <h1 className="text-3xl font-bold mb-6 text-center bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent">
+          {adventureType} Adventure
+        </h1>
+        <div ref={scrollRef} className="flex-grow overflow-y-auto mb-6 pr-4">
           {scenarioHistory.map((scenario, index) => (
             <div key={index} className="mb-4">
               {scenario.action && (
@@ -128,37 +132,32 @@ export default function Game() {
               <span className="animate-pulse">...</span>
             </div>
           )}
-          <div ref={bottomRef} />
         </div>
-        <div className="p-4 bg-gray-800">
-          {!isLoading && currentOptions.length === 4 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {currentOptions.map((option, optionIndex) => (
-                <button
-                  key={optionIndex}
-                  className="bg-cyan-600 hover:bg-cyan-700 p-4 rounded text-left"
-                  onClick={() => handleOptionClick(option)}
-                >
-                  {renderTranslatableText(option, true)}
-                </button>
-              ))}
-            </div>
-          )}
-          <div className="flex">
-            <input
-              type="text"
-              value={customAction}
-              onChange={(e) => setCustomAction(e.target.value)}
-              placeholder="Or type your own action..."
-              className="flex-grow bg-gray-700 text-white p-2 rounded-l"
-            />
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {currentOptions.map((option, index) => (
             <button
-              onClick={handleCustomAction}
-              className="bg-purple-600 hover:bg-purple-700 p-2 rounded-r"
+              key={index}
+              onClick={() => handleOptionClick(option)}
+              className="bg-cyan-700 hover:bg-cyan-600 text-white font-bold py-2 px-4 rounded transition duration-300"
             >
-              &gt;
+              {renderTranslatableText(option, true)}
             </button>
-          </div>
+          ))}
+        </div>
+        <div className="flex">
+          <input
+            type="text"
+            value={customAction}
+            onChange={(e) => setCustomAction(e.target.value)}
+            placeholder="Ou digite sua própria ação..."
+            className="flex-grow bg-gray-700 text-white rounded-l px-3 py-2"
+          />
+          <button
+            onClick={handleCustomAction}
+            className="bg-fuchsia-600 hover:bg-fuchsia-500 text-white font-bold py-2 px-4 rounded-r transition duration-300"
+          >
+            &gt;
+          </button>
         </div>
       </div>
     </div>

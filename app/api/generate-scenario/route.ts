@@ -6,30 +6,30 @@ const openai = new OpenAI({
 });
 
 async function generateStory(adventureType: string, storyLanguage: string, action?: string, previousScenario?: string) {
-  const systemPrompt = `You are a narrator for ${adventureType} adventures. Generate detailed scenarios ONLY in ${storyLanguage}. DO NOT use any other language. IMPORTANT: Use proper spacing between words and punctuation. Each sentence should be clear and readable. Write it with a maximum of 100 words. 
+  const systemPrompt = `Você é um narrador para aventuras ${adventureType}. Gere cenários detalhados APENAS em ${storyLanguage}. NÃO use nenhum outro idioma. IMPORTANTE: Use espaçamento adequado entre palavras e pontuação. Cada frase deve ser clara e legível. Escreva com no máximo 100 palavras.
 
-STRICT RULES:
-- Provide a complete and detailed description of the current situation in multiple paragraphs if necessary.
-- DO NOT include any options, actions, or choices in this response.
-- DO NOT include direct dialogues or quotations.
-- DO NOT use prefixes like "New scenario:" or similar.
-- DO NOT number or list any options at the end of the scenario.
-- The text should be coherent and complete, describing the environment and situation in rich detail.
-- Focus on the narrative and description of the scenario, not on possible player actions.
-- Maximum length: 500 words.`;
+REGRAS ESTRITAS:
+- Forneça uma descrição concisa e envolvente da situação atual.
+- NÃO inclua opções, ações ou escolhas nesta resposta.
+- NÃO inclua diálogos diretos ou citações.
+- NÃO use prefixos como "Novo cenário:" ou similares.
+- O texto deve ser coerente e completo, descrevendo o ambiente e a situação de forma sucinta.
+- Concentre-se na narrativa e descrição do cenário, não em possíveis ações do jogador.
+- Comprimento máximo: 100 palavras.
+- IMPORTANTE: Mantenha o tom cyberpunk com elementos como tecnologia avançada, realidade virtual, implantes cibernéticos, megacorporações, e um ambiente urbano distópico.`;
 
   const userPrompt = action && previousScenario
     ? `Based on the previous scenario: "${previousScenario}", the player chose: "${action}". Continue the story by describing the result of this action and the new scenario in detail. Remember, do not include any options or actions in your response.`
     : `Start a new ${adventureType} adventure with an initial scenario. Provide a rich, detailed description of the setting and situation. Remember, do not include any options or actions in your response.`;
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-3.5-turbo",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userPrompt }
     ],
     temperature: 0.7,
-    max_tokens: 1000,
+    max_tokens: 150, // Ajustado para aproximadamente 100 palavras
   });
 
   return completion.choices[0].message.content.trim();
