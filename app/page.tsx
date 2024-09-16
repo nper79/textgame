@@ -19,6 +19,8 @@ function StoryCard({ title = "Title of adventure", summary = "Summary of the adv
           alt={title}
           layout="fill"
           objectFit="cover"
+          loading="lazy"
+          sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
         />
       </div>
       <hr className="border-t border-gray-700 m-0" />
@@ -46,30 +48,30 @@ const stories = [
     id: "blue-mage",
     title: "You Are A Blue Mage, But T...",
     summary: "Blue Mages are a special type of magic user, who forges the typical choice of whether they want to heal or deal damage, instead ...",
-    image: "/placeholder.svg?height=400&width=400"
+    image: "/images/blue-mage.jpg"
   },
   {
     id: "enchanted-forest",
     title: "The Enchanted Forest",
     summary: "Explore a mystical forest filled with magical creatures and hidden treasures. Your choices will shape the fate of this enchanted realm.",
-    image: "/placeholder.svg?height=400&width=400"
+    image: "/images/enchanted-forest.jpg"
   },
   {
     id: "cyberpunk-adventure",
     title: "Cyberpunk Detective",
     summary: "In a neon-lit future, you're a detective with cybernetic enhancements. Solve crimes and uncover conspiracies in this thrilling sci-fi adventure.",
-    image: "/placeholder.svg?height=400&width=400"
+    image: "/images/cyberpunk-detective.jpg"
   },
   {
     id: "pirate-legacy",
     title: "Pirate's Legacy",
     summary: "Set sail on the high seas as a daring pirate captain. Build your crew, find treasure, and become a legend of the Caribbean.",
-    image: "/placeholder.svg?height=400&width=400"
+    image: "/images/pirate-legacy.jpg"
   },
-  { id: "placeholder-1", image: "/placeholder.svg?height=400&width=400" },
-  { id: "placeholder-2", image: "/placeholder.svg?height=400&width=400" },
-  { id: "placeholder-3", image: "/placeholder.svg?height=400&width=400" },
-  { id: "placeholder-4", image: "/placeholder.svg?height=400&width=400" }
+  { id: "placeholder-1", image: "/images/placeholder-1.jpg", title: "Coming Soon", summary: "New adventure coming soon!" },
+  { id: "placeholder-2", image: "/images/placeholder-2.jpg", title: "Coming Soon", summary: "New adventure coming soon!" },
+  { id: "placeholder-3", image: "/images/placeholder-3.jpg", title: "Coming Soon", summary: "New adventure coming soon!" },
+  { id: "placeholder-4", image: "/images/placeholder-4.jpg", title: "Coming Soon", summary: "New adventure coming soon!" }
 ]
 
 export default function Homepage() {

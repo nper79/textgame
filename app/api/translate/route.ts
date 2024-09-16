@@ -1,21 +1,36 @@
-import { NextResponse } from "next/server";
-import { translateText } from '@/app/lib/translation';
+import { NextResponse } from 'next/server'
+import OpenAI from 'openai'
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export async function POST(request: Request) {
+  const { word, fromLanguage, toLanguage } = await request.json()
+
+  console.log('Recebido pedido de tradução:', { word, fromLanguage, toLanguage })
+
+  if (!word || !fromLanguage || !toLanguage) {
+    return NextResponse.json({ error: 'Parâmetros de tradução incompletos' }, { status: 400 })
+  }
+
   try {
-    const { word, fromLanguage, toLanguage } = await request.json();
-    
-    console.log('Recebido pedido de tradução:', { word, fromLanguage, toLanguage });
+    const completion = await openai.chat.completions.create({
+      model: "gpt-3.5-turbo",
+      messages: [
+        { role: "system", content: `Translate the following ${fromLanguage} word or phrase to ${toLanguage}. Respond only with the translation, nothing else.` },
+        { role: "user", content: word }
+      ],
+      temperature: 0.3,
+      max_tokens: 60,
+    })
 
-    if (!word || !fromLanguage || !toLanguage) {
-      throw new Error('Parâmetros de tradução incompletos');
-    }
+    const translation = completion.choices[0].message.content.trim()
+    console.log('Tradução:', translation)
 
-    const translation = await translateText(word, fromLanguage, toLanguage);
-    console.log('Tradução bem-sucedida:', translation);
-    return NextResponse.json({ translation });
+    return NextResponse.json({ translation })
   } catch (error) {
-    console.error('Erro detalhado na tradução:', error);
-    return NextResponse.json({ error: 'Falha na tradução: ' + (error as Error).message }, { status: 500 });
+    console.error('Erro na tradução:', error)
+    return NextResponse.json({ error: 'Falha ao traduzir' }, { status: 500 })
   }
 }
