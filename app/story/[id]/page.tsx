@@ -12,42 +12,46 @@ export default function StoryPage({ params }: { params: { id: string } }) {
   const [customAction, setCustomAction] = useState('')
   const searchParams = useSearchParams()
 
-  const targetLanguage = searchParams.get('target') || 'en'
-  const nativeLanguage = searchParams.get('native') || 'en'
-
-  const storyPrompt = storyPrompts.find(prompt => prompt.id === params.id)
+  const storyLanguage = searchParams.get('target') || 'en'
+  const translationLanguage = searchParams.get('native') || 'en'
 
   useEffect(() => {
-    if (storyPrompt && storyPrompt.prompt) {
-      generateStoryContent(storyPrompt.prompt, targetLanguage)
-    } else {
-      setStory('Erro: Prompt da história não encontrado.')
-    }
-  }, [params.id, targetLanguage])
+    fetchInitialScenario()
+  }, [])
 
-  const generateStoryContent = async (prompt: string, language: string) => {
-    try {
-      const response = await fetch('/api/generate-scenario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, language }),
-      })
-      const data = await response.json()
-      setStory(data.scenario)
-      setOptions(data.options)
-    } catch (error) {
-      console.error("Erro ao gerar conteúdo da história:", error)
-      setStory('Erro ao carregar a história. Por favor, tente novamente.')
-    }
+  const fetchInitialScenario = async () => {
+    const response = await fetch('/api/generate-scenario', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        storyId: params.id,
+        storyLanguage,
+      }),
+    })
+    const data = await response.json()
+    setStory(data.scenario)
+    setOptions(data.options)
   }
 
-  const handleOptionClick = (option: string) => {
-    generateStoryContent(option, targetLanguage)
+  const handleOptionClick = async (option: string) => {
+    const response = await fetch('/api/process-action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: option,
+        storyId: params.id,
+        storyLanguage,
+        previousScenario: story,
+      }),
+    })
+    const data = await response.json()
+    setStory(data.scenario)
+    setOptions(data.options)
   }
 
-  const handleCustomAction = () => {
+  const handleCustomAction = async () => {
     if (customAction.trim()) {
-      generateStoryContent(customAction.trim(), targetLanguage)
+      await handleOptionClick(customAction.trim())
       setCustomAction('')
     }
   }
@@ -61,8 +65,8 @@ export default function StoryPage({ params }: { params: { id: string } }) {
           <React.Fragment key={index}>
             <TranslatableWord
               word={word}
-              fromLanguage={targetLanguage}
-              toLanguage={nativeLanguage}
+              fromLanguage={storyLanguage}
+              toLanguage={translationLanguage}
               onClick={isOption ? (e) => e.stopPropagation() : undefined}
             />
             {' '}
@@ -73,9 +77,9 @@ export default function StoryPage({ params }: { params: { id: string } }) {
   }
 
   return (
-    <div className="min-h-screen bg-cover bg-center flex items-center justify-center p-4" style={{backgroundImage: "url('/images/cyberbackground.webp')"}}>
+    <div className="min-h-screen bg-cover bg-center flex items-center justify-center p-4" style={{backgroundImage: "url('/images/story-background.jpg')"}}>
       <div className="bg-black bg-opacity-70 text-white p-8 rounded-lg shadow-lg max-w-3xl w-full flex flex-col h-[80vh]">
-        <h1 className="text-2xl font-bold mb-4 text-center text-cyan-400">{storyPrompt?.title || 'Adventure'}</h1>
+        <h1 className="text-2xl font-bold mb-4 text-center text-cyan-400">Adventure</h1>
         <div className="flex-grow overflow-y-auto mb-4">
           {renderTranslatableText(story)}
         </div>

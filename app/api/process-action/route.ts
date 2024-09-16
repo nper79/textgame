@@ -15,18 +15,20 @@ function preprocessText(text: string) {
 
 export async function POST(request: Request) {
   try {
-    const { action, adventureType, storyLanguage } = await request.json();
+    const { action, storyId, storyLanguage, previousScenario } = await request.json();
+
+    const storyPrompt = storyPrompts[storyId] || 'You are a storyteller for an adventure game.';
 
     const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: `You are a storyteller for a ${adventureType} adventure game. Continue the story based on the player's action. Provide a new scenario and 4 new options for the player. Respond in ${storyLanguage}.`
+          content: `${storyPrompt} Continue the story based on the player's action. Provide a new scenario and 4 new options for the player. Respond in ${storyLanguage}.`
         },
         {
           role: "user",
-          content: `The player chose: ${action}`
+          content: `Previous scenario: ${previousScenario}\n\nThe player chose: ${action}`
         }
       ],
       temperature: 0.7,
@@ -36,10 +38,7 @@ export async function POST(request: Request) {
     const content = response.choices[0].message.content;
     const [scenario, ...options] = content.split('\n').filter(line => line.trim() !== '');
 
-    const preprocessedScenario = preprocessText(scenario);
-    const preprocessedOptions = options.map(preprocessText);
-
-    return NextResponse.json({ scenario: preprocessedScenario, options: preprocessedOptions });
+    return NextResponse.json({ scenario, options });
   } catch (error) {
     console.error('Erro ao processar ação:', error);
     return NextResponse.json({ error: 'Falha ao processar ação' }, { status: 500 });

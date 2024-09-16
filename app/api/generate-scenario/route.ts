@@ -75,30 +75,16 @@ Option 4`;
 
 export async function POST(request: Request) {
   try {
-    const { adventureType, storyLanguage, action, previousScenario } = await request.json();
+    const { storyId, storyLanguage, action, previousScenario } = await request.json();
 
-    // Generate the new story segment
-    const newScenario = await generateStory(adventureType, storyLanguage, action, previousScenario);
+    const adventureType = storyId === 'enchanted-forest' ? 'magical forest' : 'cyberpunk';
 
-    // Generate options based on the new story segment
-    let options = await generateOptions(newScenario, adventureType, storyLanguage);
+    const scenario = await generateStory(adventureType, storyLanguage, action, previousScenario);
+    const options = await generateOptions(scenario, adventureType, storyLanguage);
 
-    // Ensure we have exactly 4 options
-    if (options.length !== 4) {
-      console.error("API did not return exactly 4 options. Falling back to default options.");
-      options = [
-        "Explore the area further",
-        "Interact with a nearby object or character",
-        "Look for an alternative path or solution",
-        "Rest and observe your surroundings"
-      ];
-    }
-
-    console.log("API Response:", { scenario: newScenario, options });
-
-    return NextResponse.json({ scenario: newScenario, options });
+    return NextResponse.json({ scenario, options });
   } catch (error) {
-    console.error("Error generating scenario:", error);
-    return NextResponse.json({ error: "Error processing the game. Please try again." }, { status: 500 });
+    console.error('Erro ao gerar cenário:', error);
+    return NextResponse.json({ error: 'Falha ao gerar cenário' }, { status: 500 });
   }
 }
