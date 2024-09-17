@@ -1,136 +1,105 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
+import React, { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import Image from 'next/image'
 import { TranslatableWord } from '@/components/TranslatableWord'
-import { TranslatableButton } from '@/components/TranslatableButton'
-import { stories } from '@/app/data/stories'
+import { TranslatableButton } from '@/components/ui/TranslatableButton'
+import { stories } from '@/data/stories'
+import { useStoryState } from '@/hooks/useStoryState'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 
 export default function StoryPage({ params }: { params: { id: string } }) {
-  const [story, setStory] = useState<string>('')
-  const [options, setOptions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(false)
   const searchParams = useSearchParams()
   const storyLanguage = searchParams.get('target') || 'Inglês'
   const translationLanguage = searchParams.get('native') || 'Português'
 
   const storyData = stories.find(s => s.id === params.id)
 
-  useEffect(() => {
-    if (storyData) {
-      fetchInitialScenario()
-    }
-  }, [storyData, storyLanguage, translationLanguage])
-
-  const fetchInitialScenario = async () => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/generate-scenario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storyId: params.id,
-          storyTitle: storyData?.title,
-          storySummary: storyData?.summary,
-          storyLanguage,
-          translationLanguage,
-        }),
-      })
-      if (!response.ok) throw new Error(`API responded with status ${response.status}`)
-      const data = await response.json()
-      if (data.scenario && data.options) {
-        setStory(data.scenario)
-        setOptions(data.options)
-      } else {
-        throw new Error('API response is missing scenario or options')
-      }
-    } catch (error) {
-      console.error('Erro ao buscar cenário inicial:', error)
-      setStory('Erro ao carregar o cenário. Por favor, tente novamente.')
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleOptionClick = async (option: string) => {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/generate-scenario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storyId: params.id,
-          storyTitle: storyData?.title,
-          storySummary: storyData?.summary,
-          storyLanguage,
-          translationLanguage,
-          action: option,
-          previousScenario: story
-        }),
-      })
-      if (!response.ok) throw new Error(`API responded with status ${response.status}`)
-      const data = await response.json()
-      if (data.scenario && data.options) {
-        setStory(prevStory => `${prevStory}\n\n${data.scenario}`)
-        setOptions(data.options)
-      } else {
-        throw new Error('API response is missing scenario or options')
-      }
-    } catch (error) {
-      console.error('Erro ao gerar próximo cenário:', error)
-      setOptions(['Erro ao carregar as opções. Por favor, tente novamente.'])
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const renderTranslatableText = (text: string) => {
-    return text.split(/(\s+)/).map((part, index) => {
-      if (part.trim().length === 0) {
-        return part
-      }
-      return (
-        <TranslatableWord
-          key={index}
-          word={part}
-          fromLanguage={storyLanguage}
-          toLanguage={translationLanguage}
-        />
-      )
-    })
-  }
-
-  if (!storyData) {
-    return <div>História não encontrada</div>
-  }
+  if (!storyData) return <div>História não encontrada</div>
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">{storyData.title}</h1>
-      {isLoading ? (
-        <div>Carregando...</div>
-      ) : (
-        <>
-          {story && (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <StoryContent
+        storyData={storyData}
+        storyLanguage={storyLanguage}
+        translationLanguage={translationLanguage}
+      />
+    </Suspense>
+  ) // Adicionado o parêntese de fechamento aqui
+}
+
+function StoryContent({
+  storyData,
+  storyLanguage,
+  translationLanguage,
+}: {
+  storyData: any
+  storyLanguage: string
+  translationLanguage: string
+}) {
+  const {
+    story,
+    options,
+    isLoading,
+    handleOptionClick,
+    customAction,
+    setCustomAction,
+    handleCustomAction,
+  } = useStoryState(storyData, storyLanguage, translationLanguage)
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white p-4">
+      <div className="max-w-2xl mx-auto">
+        <h1 className="text-2xl mb-4">{storyData.title}</h1>
+        {isLoading ? (
+          <p>Carregando...</p>
+        ) : (
+          <>
             <div className="mb-6 text-lg">
-              {renderTranslatableText(story)}
+              {story.split(/(\s+)/).map((word: string, index: number) =>
+                word.trim().length === 0 ? (
+                  word
+                ) : (
+                  <TranslatableWord
+                    key={index}
+                    word={word}
+                    fromLanguage={storyLanguage}
+                    toLanguage={translationLanguage}
+                  />
+                )
+              )}
             </div>
-          )}
-          {options.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              {options.map((option, index) => (
-                <TranslatableButton
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              {options.map((option: string, index: number) => (
+                <Button
                   key={index}
-                  text={`${index + 1}. ${option}`}
                   onClick={() => handleOptionClick(option)}
-                  fromLanguage={storyLanguage}
-                  toLanguage={translationLanguage}
-                />
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {option}
+                </Button>
               ))}
             </div>
-          )}
-        </>
-      )}
+            <div className="flex">
+              <Input
+                type="text"
+                value={customAction}
+                onChange={(e) => setCustomAction(e.target.value)}
+                placeholder="Ou digite sua própria ação..."
+                className="flex-grow bg-gray-700 text-white rounded-l px-3 py-2"
+              />
+              <Button
+                onClick={handleCustomAction}
+                className="bg-purple-600 hover:bg-purple-700 rounded-l-none"
+              >
+                Enviar
+              </Button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

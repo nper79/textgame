@@ -13,6 +13,10 @@ const nextConfig = {
     }
     return config;
   },
+  images: {
+    domains: ['localhost'],
+    formats: ['image/webp'],
+  },
 };
 
 export default nextConfig;
