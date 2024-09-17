@@ -1,21 +1,26 @@
 import { NextResponse } from "next/server"
+import OpenAI from "openai"
+
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+})
 
 export async function POST(request: Request) {
   console.log('Recebida requisição POST em /api/generate-scenario')
   try {
-    const { storyId, storyTitle, storySummary, storyLanguage, action, previousScenario } = await request.json()
-    console.log('Dados recebidos:', { storyId, storyTitle, storySummary, storyLanguage, action })
+    const { storyId, storyTitle, storySummary, storyLanguage, translationLanguage, action, previousScenario } = await request.json()
+    console.log('Dados recebidos:', { storyId, storyTitle, storySummary, storyLanguage, translationLanguage, action })
 
-    let prompt = `Continue a história "${storyTitle}" em ${storyLanguage}. `
+    let prompt = `Create a story scenario for "${storyTitle}" in ${storyLanguage}. `
     if (previousScenario && action) {
-      prompt += `Cenário anterior: "${previousScenario}". O jogador escolheu: "${action}". `
+      prompt += `Previous scenario: "${previousScenario}". The player chose: "${action}". `
     }
-    prompt += `Crie um novo cenário e 4 novas opções para o jogador.`
+    prompt += `Create a new scenario and 4 new options for the player. The entire response must be in ${storyLanguage}.`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "Você é um narrador criativo de histórias interativas." },
+        { role: "system", content: "You are a creative storyteller for interactive stories." },
         { role: "user", content: prompt }
       ],
       temperature: 0.7,

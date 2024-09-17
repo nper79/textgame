@@ -8,8 +8,6 @@ const openai = new OpenAI({
 export async function POST(request: Request) {
   const { word, fromLanguage, toLanguage } = await request.json()
 
-  console.log('Recebido pedido de tradução:', { word, fromLanguage, toLanguage })
-
   if (!word || !fromLanguage || !toLanguage) {
     return NextResponse.json({ error: 'Parâmetros de tradução incompletos' }, { status: 400 })
   }
@@ -26,8 +24,6 @@ export async function POST(request: Request) {
     })
 
     const translation = completion.choices[0].message.content.trim()
-    console.log('Tradução:', translation)
-
     return NextResponse.json({ translation })
   } catch (error) {
     console.error('Erro na tradução:', error)
