@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 
 interface StoryData {
   id: string
@@ -6,88 +6,78 @@ interface StoryData {
   summary: string
 }
 
-export function useStoryState(storyData: StoryData, storyLanguage: string, translationLanguage: string) {
-  const [story, setStory] = useState('')
+interface UseStoryStateProps {
+  storyData: StoryData
+  storyLanguage: string
+}
+
+export function useStoryState({ storyData, storyLanguage }: UseStoryStateProps) {
+  const [story, setStory] = useState<string>('')
   const [options, setOptions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [customAction, setCustomAction] = useState('')
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [customAction, setCustomAction] = useState<string>('')
+  const isMounted = useRef<boolean>(true)
 
-  useEffect(() => {
-    fetchInitialScenario()
-  }, [storyData, storyLanguage, translationLanguage])
-
-  async function fetchInitialScenario() {
+  const fetchScenario = useCallback(async (action?: string) => {
+    if (!isMounted.current) return
     setIsLoading(true)
     try {
+      console.log('DEBUG - Fetching scenario with:', { storyLanguage, storyTitle: storyData.title, action })
       const response = await fetch('/api/generate-scenario', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          storyId: storyData.id,
+          storyLanguage,
           storyTitle: storyData.title,
           storySummary: storyData.summary,
-          storyLanguage,
-          translationLanguage,
+          action,
+          previousScenario: story,
         }),
       })
-      if (!response.ok) throw new Error(`API responded with status ${response.status}`)
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch scenario')
+      }
+
       const data = await response.json()
-      if (data.scenario && data.options) {
+      console.log('DEBUG - API response:', data)
+      if (isMounted.current) {
         setStory(data.scenario)
         setOptions(data.options)
-      } else {
-        throw new Error('API response is missing scenario or options')
+        console.log('DEBUG - State updated:', { scenario: data.scenario, options: data.options })
       }
     } catch (error) {
-      console.error('Erro ao buscar cenário inicial:', error)
-      setStory('Erro ao carregar o cenário. Por favor, tente novamente.')
+      console.error('Error fetching scenario:', error)
+      if (isMounted.current) {
+        setStory('Erro ao carregar a história. Por favor, tente novamente.')
+        setOptions([])
+      }
     } finally {
-      setIsLoading(false)
+      if (isMounted.current) {
+        setIsLoading(false)
+      }
     }
-  }
+  }, [storyLanguage, storyData.title, storyData.summary, story])
 
-  async function handleOptionClick(option: string) {
-    await fetchNextScenario(option)
-  }
+  useEffect(() => {
+    fetchScenario()
+    return () => {
+      isMounted.current = false
+    }
+  }, [fetchScenario])
 
-  async function handleCustomAction() {
+  const handleOptionClick = useCallback((option: string) => {
+    fetchScenario(option)
+  }, [fetchScenario])
+
+  const handleCustomAction = useCallback(() => {
     if (customAction.trim()) {
-      await fetchNextScenario(customAction.trim())
+      fetchScenario(customAction.trim())
       setCustomAction('')
     }
-  }
-
-  async function fetchNextScenario(action: string) {
-    setIsLoading(true)
-    try {
-      const response = await fetch('/api/generate-scenario', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          storyId: storyData.id,
-          storyTitle: storyData.title,
-          storySummary: storyData.summary,
-          storyLanguage,
-          translationLanguage,
-          action,
-          previousScenario: story
-        }),
-      })
-      if (!response.ok) throw new Error(`API responded with status ${response.status}`)
-      const data = await response.json()
-      if (data.scenario && data.options) {
-        setStory(prevStory => `${prevStory}\n\n${data.scenario}`)
-        setOptions(data.options)
-      } else {
-        throw new Error('API response is missing scenario or options')
-      }
-    } catch (error) {
-      console.error('Erro ao gerar próximo cenário:', error)
-      setOptions(['Erro ao carregar as opções. Por favor, tente novamente.'])
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  }, [customAction, fetchScenario])
 
   return {
     story,

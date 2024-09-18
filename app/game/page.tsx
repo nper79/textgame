@@ -1,27 +1,27 @@
-'use client'
+'use client';
 
-import React, { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
-import TranslatableWord from '@/components/TranslatableWord'
-import { Button } from "@/components/ui/button"
+import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
+import TranslatableWord from '@/components/TranslatableWord';
+import { Button } from "@/components/ui/button";
 
 export default function Game() {
-  const searchParams = useSearchParams()
-  const [story, setStory] = useState<string>('')
-  const [options, setOptions] = useState<string[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [customAction, setCustomAction] = useState('')
+  const searchParams = useSearchParams();
+  const [story, setStory] = useState<string>('');
+  const [options, setOptions] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [customAction, setCustomAction] = useState('');
 
-  const adventureType = searchParams.get('type') || 'Fantasy'
-  const storyLanguage = searchParams.get('story') || 'English'
-  const translationLanguage = searchParams.get('translation') || 'Portuguese'
+  const adventureType = searchParams.get('type') || 'Fantasy';
+  const storyLanguage = searchParams.get('story') || 'English';
+  const translationLanguage = searchParams.get('translation') || 'Portuguese';
 
   useEffect(() => {
-    fetchScenario()
-  }, [])
+    fetchScenario();
+  }, []);
 
   const fetchScenario = async (action?: string) => {
-    setIsLoading(true)
+    setIsLoading(true);
     try {
       const response = await fetch('/api/generate-scenario', {
         method: 'POST',
@@ -32,38 +32,38 @@ export default function Game() {
           action, 
           previousScenario: story 
         }),
-      })
-      const data = await response.json()
+      });
+      const data = await response.json();
       
       if (data.scenario && data.options) {
-        setStory(prevStory => action ? `${prevStory}\n\n${data.scenario}` : data.scenario)
-        setOptions(data.options)
+        setStory(prevStory => action ? `${prevStory}\n\n${data.scenario}` : data.scenario);
+        setOptions(data.options);
       } else {
-        throw new Error("Invalid response from API")
+        throw new Error("Invalid response from API");
       }
     } catch (error) {
-      console.error("Error fetching scenario:", error)
+      console.error("Error fetching scenario:", error);
       setOptions([
         "Explorar a área",
         "Interagir com um objeto próximo",
         "Procurar um caminho alternativo",
         "Descansar e observar o ambiente"
-      ])
+      ]);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const handleOptionClick = (option: string) => {
-    fetchScenario(option)
-  }
+    fetchScenario(option);
+  };
 
   const handleCustomAction = () => {
     if (customAction.trim()) {
-      fetchScenario(customAction.trim())
-      setCustomAction('')
+      fetchScenario(customAction.trim());
+      setCustomAction('');
     }
-  }
+  };
 
   const renderTranslatableText = (text: string) => {
     return text.split(/(\s+)/).map((word, index) => {
@@ -122,5 +122,5 @@ export default function Game() {
         )}
       </div>
     </div>
-  )
+  );
 }

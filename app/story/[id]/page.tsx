@@ -1,105 +1,77 @@
-"use client"
+'use client'
 
-import React, { Suspense } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
-import Image from 'next/image'
-import { TranslatableWord } from '@/components/TranslatableWord'
-import { TranslatableButton } from '@/components/ui/TranslatableButton'
-import { stories } from '@/data/stories'
-import { useStoryState } from '@/hooks/useStoryState'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 
-export default function StoryPage({ params }: { params: { id: string } }) {
-  const searchParams = useSearchParams()
-  const storyLanguage = searchParams.get('target') || 'Inglês'
-  const translationLanguage = searchParams.get('native') || 'Português'
-
-  const storyData = stories.find(s => s.id === params.id)
-
-  if (!storyData) return <div>História não encontrada</div>
-
-  return (
-    <Suspense fallback={<div>Carregando...</div>}>
-      <StoryContent
-        storyData={storyData}
-        storyLanguage={storyLanguage}
-        translationLanguage={translationLanguage}
-      />
-    </Suspense>
-  ) // Adicionado o parêntese de fechamento aqui
+interface StoryData {
+  id: string
+  title: string
+  summary: string
+  options: string[]
 }
 
-function StoryContent({
-  storyData,
-  storyLanguage,
-  translationLanguage,
-}: {
-  storyData: any
-  storyLanguage: string
-  translationLanguage: string
-}) {
-  const {
-    story,
-    options,
-    isLoading,
-    handleOptionClick,
-    customAction,
-    setCustomAction,
-    handleCustomAction,
-  } = useStoryState(storyData, storyLanguage, translationLanguage)
+const StoryPage: React.FC = () => {
+  const [storyData, setStoryData] = useState<StoryData | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const searchParams = useSearchParams()
+
+  const fetchStory = async (choice?: string) => {
+    setIsLoading(true)
+    const id = searchParams.get('id') || 'default'
+    const language = searchParams.get('target') || 'en'
+    const nativeLanguage = searchParams.get('native') || 'en'
+
+    try {
+      const response = await fetch(`/api/story?id=${id}&language=${language}&choice=${choice || ''}`)
+      const data = await response.json()
+      setStoryData(data)
+    } catch (error) {
+      console.error('Erro ao obter dados da história:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchStory()
+  }, [])
+
+  const handleOptionClick = (option: string) => {
+    fetchStory(option)
+  }
+
+  if (isLoading) return <div>Carregando...</div>
+  if (!storyData) return <div>Erro ao carregar a história. Por favor, tente novamente.</div>
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white p-4">
-      <div className="max-w-2xl mx-auto">
-        <h1 className="text-2xl mb-4">{storyData.title}</h1>
-        {isLoading ? (
-          <p>Carregando...</p>
-        ) : (
-          <>
-            <div className="mb-6 text-lg">
-              {story.split(/(\s+)/).map((word: string, index: number) =>
-                word.trim().length === 0 ? (
-                  word
-                ) : (
-                  <TranslatableWord
-                    key={index}
-                    word={word}
-                    fromLanguage={storyLanguage}
-                    toLanguage={translationLanguage}
-                  />
-                )
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              {options.map((option: string, index: number) => (
-                <Button
-                  key={index}
-                  onClick={() => handleOptionClick(option)}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  {option}
-                </Button>
-              ))}
-            </div>
-            <div className="flex">
-              <Input
-                type="text"
-                value={customAction}
-                onChange={(e) => setCustomAction(e.target.value)}
-                placeholder="Ou digite sua própria ação..."
-                className="flex-grow bg-gray-700 text-white rounded-l px-3 py-2"
-              />
-              <Button
-                onClick={handleCustomAction}
-                className="bg-purple-600 hover:bg-purple-700 rounded-l-none"
-              >
-                Enviar
-              </Button>
-            </div>
-          </>
-        )}
+    <div style={{ padding: '20px', maxWidth: '800px', margin: '0 auto' }}>
+      <h1 style={{ color: '#333' }}>{storyData.title}</h1>
+      <p style={{ fontSize: '18px', lineHeight: '1.6' }}>{storyData.summary}</p>
+      <h2 style={{ color: '#555', marginTop: '20px' }}>Opções:</h2>
+      <ul style={{ listStyleType: 'none', padding: 0 }}>
+        {storyData.options.map((option, index) => (
+          <li 
+            key={index} 
+            onClick={() => handleOptionClick(option)}
+            style={{ 
+              backgroundColor: '#f0f0f0', 
+              margin: '10px 0', 
+              padding: '10px', 
+              borderRadius: '5px',
+              cursor: 'pointer'
+            }}
+          >
+            {option}
+          </li>
+        ))}
+      </ul>
+      <div style={{ marginTop: '20px', fontSize: '14px', color: '#777' }}>
+        ID da História: {storyData.id}<br />
+        Idioma: {searchParams.get('target') || 'en'}<br />
+        Idioma Nativo: {searchParams.get('native') || 'en'}
       </div>
     </div>
   )
 }
+
+export default StoryPage
