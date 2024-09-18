@@ -4,36 +4,84 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export async function getStoryData(id: string, language: string, nativeLanguage: string, previousChoice?: string) {
-  console.log(`Iniciando geração de história para id: ${id}, idioma: ${language}, idioma nativo: ${nativeLanguage}, escolha anterior: ${previousChoice}`);
+export async function getStoryData(
+  id: string,
+  language: string,
+  nativeLanguage: string,
+  previousChoice?: string,
+  previousSummary?: string
+) {
+  console.log(
+    `Iniciando geração de história para id: ${id}, idioma: ${language}, idioma nativo: ${nativeLanguage}, escolha anterior: ${previousChoice}`
+  );
 
-  // Gerar a história
-  const storyPrompt = `Generate a brief adventure story in ${language}. The story should have a title and a short summary. IMPORTANT: The entire response, including the title and summary, MUST be in ${language}.`;
+  const languageMap: { [key: string]: string } = {
+    en: 'English',
+    de: 'German',
+    es: 'Spanish',
+    fr: 'French',
+    pt: 'Portuguese',
+  };
+
+  const mappedLanguage = languageMap[language] || 'English';
+
+  let storyPrompt = '';
+
+  if (!previousSummary) {
+    storyPrompt = `Gere uma breve história de aventura em ${mappedLanguage}. A história deve ter um título e um resumo curto. IMPORTANTE: A resposta inteira, incluindo o título e o resumo, DEVE ser em ${mappedLanguage}.`;
+  } else {
+    storyPrompt = `Continue a seguinte história em ${mappedLanguage}, levando em conta a escolha do jogador. A história até agora é:
+
+"${previousSummary}"
+
+O jogador escolheu: "${previousChoice}"
+
+Continue a história, fornecendo a próxima parte da narrativa. IMPORTANTE: A resposta inteira DEVE ser em ${mappedLanguage}.`;
+  }
+
   const storyCompletion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: storyPrompt }],
+    model: 'gpt-3.5-turbo',
+    messages: [{ role: 'user', content: storyPrompt }],
   });
 
   const storyContent = storyCompletion.choices[0].message.content;
-  const [title, summary] = storyContent.split('\n\n');
 
-  // Gerar as opções
-  const optionsPrompt = `Based on this story in ${language}:\n\n${summary}\n\nGenerate 4 different options to continue the story. Each option should be a short sentence. IMPORTANT: All options MUST be in ${language}.`;
+  let title = '';
+  let summary = '';
+
+  if (!previousSummary) {
+    [title, summary] = storyContent.split('\n\n');
+  } else {
+    title = '';
+    summary = storyContent.trim();
+  }
+
+  const optionsPrompt = `Com base na história até agora em ${mappedLanguage}:
+
+"${previousSummary ? previousSummary + '\n\n' + summary : summary}"
+
+Gere 4 opções diferentes para o jogador escolher para continuar a história. Cada opção deve ser uma frase curta. IMPORTANTE: Todas as opções DEVEM ser em ${mappedLanguage}. **Não inclua numeração ou marcadores; forneça apenas as opções como frases simples separadas por novas linhas.**`;
+
   const optionsCompletion = await openai.chat.completions.create({
-    model: "gpt-3.5-turbo",
-    messages: [{ role: "user", content: optionsPrompt }],
+    model: 'gpt-3.5-turbo',
+    messages: [{ role: 'user', content: optionsPrompt }],
   });
 
-  const options = optionsCompletion.choices[0].message.content.split('\n');
+  const optionsText = optionsCompletion.choices[0].message.content;
+  const options = optionsText
+    .split('\n')
+    .map((opt) => opt.trim())
+    .filter((opt) => opt !== '')
+    .map((opt) => opt.replace(/^(Opção\s*\d+:?\s*)/, ''));
 
-  console.log(`Finalizando geração de história para id: ${id}`);
-  console.log(`Título gerado: ${title}`);
-  console.log(`Resumo gerado: ${summary}`);
-  console.log(`Opções geradas: ${options.join(', ')}`);
+  console.log(`Geração de história concluída para id: ${id}`);
+  console.log(`Título Gerado: ${title}`);
+  console.log(`Resumo Gerado: ${summary}`);
+  console.log(`Opções Geradas: ${options.join(', ')}`);
 
   return {
     id,
-    title: title.replace(/^(Title:|Título:)\s*/i, ''),
+    title: title ? title.replace(/^(Title:|Título:)\s*/i, '') : undefined,
     summary,
     options,
   };
