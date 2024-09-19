@@ -19,6 +19,16 @@ export default function SelectLanguage() {
   const searchParams = useSearchParams()
   const storyId = searchParams.get('id')
 
+  // Atualizando a lista de idiomas para incluir o checo
+  const languages = [
+    { code: 'en', name: 'English' },
+    { code: 'de', name: 'German' },
+    { code: 'es', name: 'Spanish' },
+    { code: 'fr', name: 'French' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'cs', name: 'Czech' }
+  ]
+
   const handleStartGame = () => {
     if (storyLanguage && translationLanguage) {
       router.push(`/story/${storyId}?target=${encodeURIComponent(storyLanguage)}&native=${encodeURIComponent(translationLanguage)}`)

@@ -21,6 +21,7 @@ export async function getStoryData(
     es: 'Spanish',
     fr: 'French',
     pt: 'Portuguese',
+    cs: 'Czech'  // Adicionando o checo aqui
   };
 
   const mappedLanguage = languageMap[language] || 'English';

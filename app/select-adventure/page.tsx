@@ -20,6 +20,8 @@ export default function SelectAdventure() {
     }
   }
 
+  const languages = ['English', 'German', 'Spanish', 'French', 'Portuguese', 'Czech'];
+
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-black">
       <div className="relative z-10 bg-gray-900/80 p-8 rounded-2xl border border-cyan-400/30 shadow-lg shadow-cyan-500/30 backdrop-blur-sm">
