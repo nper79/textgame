@@ -79,8 +79,13 @@ const StoryPage: React.FC = () => {
 
       const data = await response.json()
 
-      // Log the options to check if they have spaces
-      console.log('Options received from API:', data.options)
+      // Log detalhado das opções
+      console.log('Opções recebidas da API (raw):', data.options)
+      console.log('Opções após normalização:')
+      data.options.forEach((option: string, index: number) => {
+        console.log(`Opção ${index + 1}:`, option)
+        console.log(`Opção ${index + 1} (normalizada):`, normalizeText(option))
+      })
 
       if ((storySegments.length === 0 && !data.title) || !data.summary || !Array.isArray(data.options) || data.options.length === 0) {
         throw new Error('Dados da história incompletos ou inválidos')
@@ -190,6 +195,16 @@ const StoryPage: React.FC = () => {
     }
   }, [tooltip])
 
+  const normalizeText = (text: string) => {
+    // Remove caracteres especiais, exceto letras acentuadas e espaços
+    const withoutSpecialChars = text.replace(/[^\w\s\u00C0-\u00FF]/g, ' ')
+    // Substitui múltiplos espaços por um único espaço
+    const normalized = withoutSpecialChars.replace(/\s+/g, ' ').trim()
+    // Adiciona espaços entre palavras se não houver, mas preserva palavras acentuadas
+    return normalized.replace(/([a-zñáéíóúü])([A-ZÑÁÉÍÓÚÜ])/g, '$1 $2')
+      .replace(/([A-ZÑÁÉÍÓÚÜ])([A-ZÑÁÉÍÓÚÜ][a-zñáéíóúü])/g, '$1 $2')
+  }
+
   const renderTranslatableText = (text: string) => {
     return text.split(' ').map((word, idx) => (
       <React.Fragment key={idx}>
@@ -236,23 +251,24 @@ const StoryPage: React.FC = () => {
               
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 {storyData!.options.map((option, index) => {
-                  const trimmedOption = option.trim()
-                  // Split the option text by any whitespace character
-                  const words = trimmedOption.split(/\s+/)
+                  const normalizedOption = normalizeText(option)
+                  console.log(`Opção ${index + 1} renderizada:`, normalizedOption)
                   return (
                     <div 
                       key={index}
                       onClick={() => handleOptionClick(option)}
                       className="bg-cyan-600 hover:bg-cyan-700 text-white border-none whitespace-normal h-auto py-2 px-4 text-left cursor-pointer rounded"
                     >
-                      {words.map((word, wordIndex) => (
-                        <span
-                          key={wordIndex}
-                          className="cursor-pointer hover:underline inline-block"
-                          onClick={(e) => handleOptionWordClick(e, word)}
-                        >
-                          {word}{' '}
-                        </span>
+                      {normalizedOption.split(/\s+/).map((word, wordIndex) => (
+                        <React.Fragment key={wordIndex}>
+                          <span
+                            className="cursor-pointer hover:underline inline-block"
+                            onClick={(e) => handleOptionWordClick(e, word)}
+                          >
+                            {word}
+                          </span>
+                          {wordIndex < normalizedOption.split(/\s+/).length - 1 && ' '}
+                        </React.Fragment>
                       ))}
                     </div>
                   )
