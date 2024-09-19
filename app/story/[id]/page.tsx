@@ -2,6 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams, useParams } from 'next/navigation'
+import { Input } from "@/components/ui/input"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { ChevronRightIcon } from "lucide-react"
 
 interface StoryData {
   id: string
@@ -15,219 +18,279 @@ interface StorySegment {
   choice?: string
 }
 
-const StoryPage: React.FC = () => {
-  console.log('Rendering StoryPage')
+interface TooltipData {
+  word: string
+  translation: string
+  x: number
+  y: number
+}
 
+const StoryPage: React.FC = () => {
   const params = useParams()
   const searchParams = useSearchParams()
-
-  // Extract parameters once
-  const id = params.id as string || 'default'
+  
+  const id = (params.id as string) || 'default'
   const language = searchParams.get('target') || 'en'
   const nativeLanguage = searchParams.get('native') || 'en'
-
-  const [storyData, setStoryData] = useState<{ id: string; title?: string } | null>(null)
+  
+  const [storyData, setStoryData] = useState<StoryData | null>(null)
   const [storySegments, setStorySegments] = useState<StorySegment[]>([])
-  const [options, setOptions] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [customAction, setCustomAction] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const debugInfoRef = useRef<string>('')
+  const [translationsCache, setTranslationsCache] = useState<{ [key: string]: string }>({})
+  const [tooltip, setTooltip] = useState<TooltipData | null>(null)
 
-  // Use a ref to track if the initial fetch has been made
+  const debugInfoRef = useRef<string>('')
   const initialFetchRef = useRef(false)
 
-  // Wrap addDebugInfo in useCallback to prevent unnecessary re-renders
   const addDebugInfo = useCallback((info: string) => {
     debugInfoRef.current += '\n' + info
     console.log(info)
   }, [])
 
-  const fetchStory = useCallback(
-    async (choice?: string, previousSummaryParam?: string) => {
-      addDebugInfo('Fetching story with choice: ' + (choice || 'initial'))
-      setIsLoading(true)
-      setError(null)
+  const fetchStory = useCallback(async (choice?: string, previousSummaryParam?: string) => {
+    addDebugInfo('Buscando história com escolha: ' + (choice || 'inicial'))
+    setIsLoading(true)
+    setError(null)
 
-      const previousSummary =
-        previousSummaryParam !== undefined
-          ? previousSummaryParam
-          : storySegments.map((segment) => segment.text).join('\n\n')
+    const previousSummary = previousSummaryParam !== undefined
+      ? previousSummaryParam
+      : storySegments.map(segment => segment.text).join('\n\n')
 
-      try {
-        addDebugInfo(
-          `Calling API with: id=${id}, language=${language}, native=${nativeLanguage}, choice=${choice || ''}`
-        )
-        const response = await fetch('/api/story', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            id,
-            language,
-            nativeLanguage,
-            choice: choice || '',
-            previousSummary,
-          }),
-        })
+    try {
+      const response = await fetch('/api/story', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id,
+          language,
+          nativeLanguage,
+          choice: choice || '',
+          previousSummary,
+        }),
+      })
 
-        addDebugInfo('API response status: ' + response.status)
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const data: StoryData = await response.json()
-        addDebugInfo('Received story data: ' + JSON.stringify(data))
-
-        if (
-          (storySegments.length === 0 && !data.title) ||
-          !data.summary ||
-          !Array.isArray(data.options) ||
-          data.options.length === 0
-        ) {
-          throw new Error('Incomplete or invalid story data')
-        }
-
-        addDebugInfo('Setting story data and segments')
-
-        if (data.title && storySegments.length === 0) {
-          // First time, set title
-          setStoryData({ id: data.id, title: data.title })
-        }
-
-        // Update story segments with the new summary and the choice made
-        setStorySegments((prev) => [...prev, { text: data.summary, choice }])
-
-        // Update options for the next set of choices
-        setOptions(data.options)
-      } catch (error) {
-        addDebugInfo('Error fetching story data: ' + error.message)
-        setError('Ops! Algo deu errado. Por favor, tente novamente.')
-      } finally {
-        addDebugInfo('Setting isLoading to false')
-        setIsLoading(false)
+      if (!response.ok) {
+        throw new Error(`Erro HTTP! status: ${response.status}`)
       }
-    },
-    [id, language, nativeLanguage, addDebugInfo, storySegments]
-  )
+
+      const data = await response.json()
+
+      // Log the options to check if they have spaces
+      console.log('Options received from API:', data.options)
+
+      if ((storySegments.length === 0 && !data.title) || !data.summary || !Array.isArray(data.options) || data.options.length === 0) {
+        throw new Error('Dados da história incompletos ou inválidos')
+      }
+
+      setStoryData(data)
+      setStorySegments(prev => [...prev, { text: data.summary, choice: choice }])
+      setIsLoading(false)
+    } catch (error) {
+      console.error('Erro ao buscar história:', error)
+      setError('Falha ao carregar história. ' + (error as Error).message)
+      setIsLoading(false)
+    }
+  }, [id, language, nativeLanguage, storySegments, addDebugInfo])
 
   useEffect(() => {
-    // Check if the initial fetch has already been made
     if (!initialFetchRef.current) {
       initialFetchRef.current = true
       fetchStory()
     }
   }, [fetchStory])
 
-  const handleOptionClick = (option: string) => {
-    const updatedPreviousSummary = [...storySegments.map((s) => s.text), options.length > 0 ? options.join('\n') : ''].join('\n\n')
+  const handleOptionWordClick = (e: React.MouseEvent<HTMLSpanElement>, word: string) => {
+    e.stopPropagation(); // Prevents the click on the word from triggering the option selection
+    handleWordClick(word, e);
+  };
 
+  const handleOptionClick = (option: string) => {
+    const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
     fetchStory(option, updatedPreviousSummary)
   }
 
-  const handleCustomAction = () => {
+  const handleCustomAction = (e: React.FormEvent) => {
+    e.preventDefault()
     if (customAction.trim()) {
-      const updatedPreviousSummary = [...storySegments.map((s) => s.text), options.length > 0 ? options.join('\n') : ''].join('\n\n')
-
+      const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
       fetchStory(customAction.trim(), updatedPreviousSummary)
       setCustomAction('')
     }
   }
 
-  return (
-    <div style={{
-      padding: '20px',
-      maxWidth: '800px',
-      margin: '0 auto',
-      backgroundColor: '#1a1a2e',
-      color: '#61dafb',
-      fontFamily: 'Arial, sans-serif'
-    }}>
-      <h2>Estado Atual:</h2>
-      <p>isLoading: {isLoading ? 'Sim' : 'Não'}</p>
-      <p>Erro: {error || 'Nenhum'}</p>
-      <p>storyData: {storyData ? 'Disponível' : 'Não disponível'}</p>
-      <p>Número de segmentos: {storySegments.length}</p>
+  const handleWordClick = async (word: string, event: React.MouseEvent) => {
+    event.preventDefault()
+    const cleanWord = word.replace(/[.,!?;:()"]/g, '').toLowerCase()
 
-      {isLoading ? (
-        <div>Carregando... (Verifique o console para mais detalhes)</div>
-      ) : error ? (
-        <div>Erro: {error}</div>
-      ) : (!storyData && storySegments.length === 0) ? (
-        <div>Nenhuma história disponível. Por favor, tente novamente.</div>
-      ) : (
-        <>
-          {storyData && storyData.title && (
-            <h1 style={{ color: '#bb86fc', textAlign: 'center' }}>{storyData.title}</h1>
-          )}
-          <div style={{
-            backgroundColor: '#0d0d1a',
-            padding: '20px',
-            borderRadius: '10px',
-            marginBottom: '20px'
-          }}>
-            {storySegments.map((segment, index) => (
-              <div key={index}>
-                {segment.choice && (
-                  <p style={{ color: '#ff79c6' }}>&gt; {segment.choice}</p>
-                )}
-                <p>{segment.text}</p>
+    if (translationsCache[cleanWord]) {
+      setTooltip({
+        word,
+        translation: translationsCache[cleanWord],
+        x: event.clientX,
+        y: event.clientY,
+      })
+    } else {
+      const translation = await translateWord(cleanWord)
+      if (translation) {
+        setTranslationsCache(prevCache => ({
+          ...prevCache,
+          [cleanWord]: translation,
+        }))
+        setTooltip({
+          word,
+          translation,
+          x: event.clientX,
+          y: event.clientY,
+        })
+      }
+    }
+  }
+
+  const translateWord = async (word: string): Promise<string | null> => {
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          word,
+          source: language,
+          target: nativeLanguage,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.text()
+        console.error('Translation API error:', errorData)
+        return null
+      }
+
+      const data = await response.json()
+      if (data && data.translation) {
+        return data.translation
+      } else {
+        console.error('Erro de tradução:', data)
+        return null
+      }
+    } catch (error) {
+      console.error('Erro ao traduzir palavra:', error)
+      return null
+    }
+  }
+
+  useEffect(() => {
+    if (tooltip) {
+      const timer = setTimeout(() => setTooltip(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [tooltip])
+
+  const renderTranslatableText = (text: string) => {
+    return text.split(' ').map((word, idx) => (
+      <React.Fragment key={idx}>
+        <span 
+          className="cursor-pointer hover:underline inline-block"
+          onClick={(e) => handleWordClick(word, e)}
+        >
+          {word}
+        </span>
+        {' '}
+      </React.Fragment>
+    ))
+  }
+
+  return (
+    <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center p-4" 
+         style={{backgroundImage: "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Omgktnq0WE63kht5XLDg36IDNAvNQN.png')"}}>
+      <div className="w-full max-w-3xl">
+        <div className="relative z-10 bg-gray-900/90 p-6 rounded-lg border border-cyan-400/30 shadow-lg shadow-cyan-500/30">
+          <h1 className="text-3xl font-bold text-center mb-6 text-cyan-400">Cyberpunk Adventure</h1>
+          
+          {isLoading ? (
+            <div className="text-white">Carregando...</div>
+          ) : error ? (
+            <div className="text-red-500">Erro: {error}</div>
+          ) : (!storyData && storySegments.length === 0) ? (
+            <div className="text-white">Nenhum dado de história disponível. Por favor, tente novamente.</div>
+          ) : (
+            <>
+              <ScrollArea className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
+                <div className="p-4">
+                  {storySegments.map((segment, index) => (
+                    <div key={index} className="mb-3">
+                      {segment.choice && (
+                        <p className="text-pink-400">&gt; {renderTranslatableText(segment.choice)}</p>
+                      )}
+                      <p className="text-cyan-300">
+                        {renderTranslatableText(segment.text)}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                {storyData!.options.map((option, index) => {
+                  const trimmedOption = option.trim()
+                  // Split the option text by any whitespace character
+                  const words = trimmedOption.split(/\s+/)
+                  return (
+                    <div 
+                      key={index}
+                      onClick={() => handleOptionClick(option)}
+                      className="bg-cyan-600 hover:bg-cyan-700 text-white border-none whitespace-normal h-auto py-2 px-4 text-left cursor-pointer rounded"
+                    >
+                      {words.map((word, wordIndex) => (
+                        <span
+                          key={wordIndex}
+                          className="cursor-pointer hover:underline inline-block"
+                          onClick={(e) => handleOptionWordClick(e, word)}
+                        >
+                          {word}{' '}
+                        </span>
+                      ))}
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-            {options.map((option, index) => (
-              <button
-                key={index}
-                onClick={() => handleOptionClick(option)}
-                style={{
-                  backgroundColor: '#03dac6',
-                  color: '#000',
-                  border: 'none',
-                  padding: '10px',
-                  borderRadius: '5px',
-                  cursor: 'pointer'
-                }}
-              >
-                {option}
-              </button>
-            ))}
-          </div>
-          <div style={{ marginTop: '20px', display: 'flex' }}>
-            <input
-              type="text"
-              value={customAction}
-              onChange={(e) => setCustomAction(e.target.value)}
-              placeholder="Ou digite sua própria ação..."
+
+              <form onSubmit={handleCustomAction} className="flex space-x-2">
+                <Input
+                  type="text"
+                  value={customAction}
+                  onChange={(e) => setCustomAction(e.target.value)}
+                  placeholder="Or type your own action..."
+                  className="flex-grow bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                />
+                <button type="submit" className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded">
+                  <ChevronRightIcon className="w-5 h-5" />
+                </button>
+              </form>
+            </>
+          )}
+          {tooltip && (
+            <div
               style={{
-                flex: 1,
-                padding: '10px',
-                borderRadius: '5px 0 0 5px',
-                border: 'none',
-                backgroundColor: '#2a2a3a',
-                color: '#fff'
-              }}
-            />
-            <button
-              onClick={handleCustomAction}
-              style={{
-                backgroundColor: '#bb86fc',
-                color: '#000',
-                border: 'none',
-                padding: '10px',
-                borderRadius: '0 5px 5px 0',
-                cursor: 'pointer'
+                position: 'fixed',
+                top: tooltip.y + 10,
+                left: tooltip.x + 10,
+                backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                color: '#fff',
+                padding: '5px 10px',
+                borderRadius: '4px',
+                zIndex: 1000,
               }}
             >
-              &gt;
-            </button>
-          </div>
-        </>
-      )}
-      <h3>Informações de Depuração:</h3>
-      <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', backgroundColor: '#000', padding: '10px', borderRadius: '5px' }}>{debugInfoRef.current}</pre>
+              {tooltip.translation}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

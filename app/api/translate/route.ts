@@ -1,32 +1,56 @@
-import { NextResponse } from 'next/server'
-import OpenAI from 'openai'
+import { NextRequest, NextResponse } from 'next/server'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
+export async function POST(request: NextRequest) {
+  const { word, source, target } = await request.json()
 
-export async function POST(request: Request) {
-  const { word, fromLanguage, toLanguage } = await request.json()
+  console.log('Variáveis de ambiente:', process.env)
+  console.log('NODE_ENV:', process.env.NODE_ENV)
 
-  if (!word || !fromLanguage || !toLanguage) {
-    return NextResponse.json({ error: 'Parâmetros de tradução incompletos' }, { status: 400 })
+  let apiKey = process.env.GOOGLE_TRANSLATE_API_KEY
+
+  if (!apiKey) {
+    console.error('API key não encontrada em process.env.GOOGLE_TRANSLATE_API_KEY')
+    apiKey = process.env['GOOGLE_TRANSLATE_API_KEY']
+    console.log('Tentativa alternativa de leitura da API key:', apiKey ? 'Encontrada' : 'Não encontrada')
   }
 
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        { role: "system", content: `Translate the following ${fromLanguage} word or phrase to ${toLanguage}. Respond only with the translation, nothing else.` },
-        { role: "user", content: word }
-      ],
-      temperature: 0.3,
-      max_tokens: 60,
-    })
+  if (!apiKey) {
+    console.error('API key não encontrada')
+    return NextResponse.json({ error: 'Configuração de API inválida' }, { status: 500 })
+  }
 
-    const translation = completion.choices[0].message.content.trim()
+  console.log('API Key:', apiKey.substring(0, 5) + '...')  // Mostra apenas os primeiros 5 caracteres por segurança
+  console.log('Request:', { word, source, target })
+
+  try {
+    const response = await fetch(
+      `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          q: word,
+          source: source,
+          target: target,
+          format: 'text',
+        }),
+      }
+    )
+
+    if (!response.ok) {
+      const errorData = await response.text()
+      console.error('Google Translate API Error:', errorData)
+      return NextResponse.json({ error: 'Falha na tradução' }, { status: response.status })
+    }
+
+    const data = await response.json()
+    const translation = data.data.translations[0].translatedText
+
     return NextResponse.json({ translation })
   } catch (error) {
-    console.error('Erro na tradução:', error)
-    return NextResponse.json({ error: 'Falha ao traduzir' }, { status: 500 })
+    console.error('Erro ao traduzir:', error)
+    return NextResponse.json({ error: 'Falha na tradução' }, { status: 500 })
   }
 }
