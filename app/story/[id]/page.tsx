@@ -114,13 +114,14 @@ const StoryPage: React.FC = () => {
   };
 
   const handleOptionClick = (option: string) => {
+    if (isLoading) return
     const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
     fetchStory(option, updatedPreviousSummary)
   }
 
   const handleCustomAction = (e: React.FormEvent) => {
     e.preventDefault()
-    if (customAction.trim()) {
+    if (customAction.trim() && !isLoading) {
       const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
       fetchStory(customAction.trim(), updatedPreviousSummary)
       setCustomAction('')
@@ -219,14 +220,10 @@ const StoryPage: React.FC = () => {
          style={{backgroundImage: "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Omgktnq0WE63kht5XLDg36IDNAvNQN.png')"}}>
       <div className="w-full max-w-3xl">
         <div className="relative z-10 bg-gray-900/90 p-6 rounded-lg border border-cyan-400/30 shadow-lg shadow-cyan-500/30">
-          <h1 className="text-3xl font-bold text-center mb-6 text-cyan-400">Cyberpunk Adventure</h1>
-          
-          {isLoading ? (
-            <div className="text-white">Carregando...</div>
-          ) : error ? (
+          {error ? (
             <div className="text-red-500">Erro: {error}</div>
           ) : (!storyData && storySegments.length === 0) ? (
-            <div className="text-white">Nenhum dado de história disponível. Por favor, tente novamente.</div>
+            <div className="text-white">Loading Adventure, please wait...</div>
           ) : (
             <>
               <ScrollArea className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
@@ -244,6 +241,16 @@ const StoryPage: React.FC = () => {
                 </div>
               </ScrollArea>
               
+              {isLoading && (
+                <div className="flex justify-center items-center mb-4">
+                  <div className="loading-dots">
+                    <span className="dot dot1"></span>
+                    <span className="dot dot2"></span>
+                    <span className="dot dot3"></span>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 {storyData!.options.map((option, index) => {
                   const normalizedOption = normalizeText(option)
@@ -251,8 +258,10 @@ const StoryPage: React.FC = () => {
                   return (
                     <div 
                       key={index}
-                      onClick={() => handleOptionClick(option)}
-                      className="bg-cyan-600 hover:bg-cyan-700 text-white border-none whitespace-normal h-auto py-2 px-4 text-left cursor-pointer rounded"
+                      onClick={() => !isLoading && handleOptionClick(option)}
+                      className={`bg-cyan-600 hover:bg-cyan-700 text-white border-none whitespace-normal h-auto py-2 px-4 text-left cursor-pointer rounded ${
+                        isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
                     >
                       {normalizedOption.split(/\s+/).map((word, wordIndex) => (
                         <React.Fragment key={wordIndex}>
@@ -277,8 +286,9 @@ const StoryPage: React.FC = () => {
                   onChange={(e) => setCustomAction(e.target.value)}
                   placeholder="Or type your own action..."
                   className="flex-grow bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                  disabled={isLoading}
                 />
-                <button type="submit" className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded">
+                <button type="submit" className="bg-pink-600 hover:bg-pink-700 text-white px-4 py-2 rounded" disabled={isLoading}>
                   <ChevronRightIcon className="w-5 h-5" />
                 </button>
               </form>
