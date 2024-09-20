@@ -196,13 +196,8 @@ const StoryPage: React.FC = () => {
   }, [tooltip])
 
   const normalizeText = (text: string) => {
-    // Remove caracteres especiais, exceto letras acentuadas e espaços
-    const withoutSpecialChars = text.replace(/[^\w\s\u00C0-\u00FF]/g, ' ')
-    // Substitui múltiplos espaços por um único espaço
-    const normalized = withoutSpecialChars.replace(/\s+/g, ' ').trim()
-    // Adiciona espaços entre palavras se não houver, mas preserva palavras acentuadas
-    return normalized.replace(/([a-zñáéíóúü])([A-ZÑÁÉÍÓÚÜ])/g, '$1 $2')
-      .replace(/([A-ZÑÁÉÍÓÚÜ])([A-ZÑÁÉÍÓÚÜ][a-zñáéíóúü])/g, '$1 $2')
+    // Apenas remove espaços em branco extras e faz trim
+    return text.trim().replace(/\s+/g, ' ');
   }
 
   const renderTranslatableText = (text: string) => {

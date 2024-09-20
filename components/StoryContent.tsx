@@ -50,6 +50,13 @@ const StoryContent: React.FC<StoryContentProps> = ({ storyData, storyLanguage })
     handleCustomAction()
   }, [customAction, handleCustomAction])
 
+  // Função para decodificar entidades HTML
+  const decodeHtmlEntities = (text: string) => {
+    const textArea = document.createElement('textarea');
+    textArea.innerHTML = text;
+    return textArea.value;
+  };
+
   return (
     <div
       className="min-h-screen bg-gray-900 text-white p-4"
@@ -60,9 +67,9 @@ const StoryContent: React.FC<StoryContentProps> = ({ storyData, storyLanguage })
       }}
     >
       <div className="max-w-2xl mx-auto bg-black bg-opacity-70 p-8 rounded-2xl border border-cyan-400/30 shadow-lg shadow-cyan-500/30 backdrop-blur-md">
-        <h1 className="text-2xl mb-4">{storyData.title}</h1>
+        <h1 className="text-2xl mb-4">{decodeHtmlEntities(storyData.title)}</h1>
         <div className="mb-4">
-          <p>{isLoading ? 'Carregando história...' : story}</p>
+          <p>{isLoading ? 'Carregando história...' : decodeHtmlEntities(story)}</p>
         </div>
         {isLoading ? (
           <p>Carregando opções...</p>
@@ -72,9 +79,9 @@ const StoryContent: React.FC<StoryContentProps> = ({ storyData, storyLanguage })
               <Button
                 key={index}
                 onClick={() => onOptionClick(option)}
-                className="bg-blue-600 hover:bg-blue-700 text-left p-2"
+                className="bg-blue-600 hover:bg-blue-700 text-left p-2 whitespace-normal break-words"
               >
-                {option}
+                {decodeHtmlEntities(option)}
               </Button>
             ))}
           </div>
