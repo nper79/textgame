@@ -5,49 +5,39 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
 
-const languageMap: { [key: string]: string } = {
-  'en': 'English',
-  'de': 'German',
-  'es': 'Spanish',
-  'fr': 'French',
-  'pt': 'Portuguese',
-}
-
 export async function POST(request: Request) {
   try {
-    const { storyLanguage, storyTitle, storySummary, action, previousScenario } = await request.json()
-    console.log('DEBUG - API recebeu:', { storyLanguage, storyTitle })
+    const { storyId, language, action, previousScenario, clickedWords } = await request.json()
 
-    const language = languageMap[storyLanguage]
-    if (!language) {
-      console.error('DEBUG - Idioma não suportado:', storyLanguage)
-      return NextResponse.json({ error: 'Unsupported language' }, { status: 400 })
-    }
+    const clickedWordsPrompt = clickedWords.length > 0 
+      ? `É MUITO IMPORTANTE usar as seguintes palavras na próxima parte da história, se possível: ${clickedWords.join(', ')}. 
+         Tente usar pelo menos 3 dessas palavras de forma natural e relevante no contexto da história.`
+      : ''
 
-    let prompt = `Create a scenario for the story "${storyTitle}" in ${language}. `
-    if (previousScenario && action) {
-      prompt += `Previous scenario: "${previousScenario}". The player chose: "${action}". `
-    }
-    prompt += `Create a new scenario (one paragraph) and 4 new options for the player (each option should be a complete sentence). The entire response must be in ${language}. Format the response as JSON with 'scenario' and 'options' fields.`
-
-    console.log('DEBUG - Prompt para OpenAI:', prompt)
+    const prompt = `Continue a história baseada no cenário anterior e na ação do jogador.
+    Cenário anterior: "${previousScenario}"
+    Ação do jogador: "${action}"
+    ${clickedWordsPrompt}
+    Forneça um novo cenário de aproximadamente 150 palavras e 4 novas opções para o jogador. 
+    Responda em ${language}.
+    LEMBRE-SE: É crucial incorporar as palavras fornecidas na história de forma natural e frequente.`
 
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: `You are a creative storyteller for interactive stories. Always respond in ${language}.` },
+        { role: "system", content: "Você é um narrador criativo para um jogo de aventura interativo. Sua tarefa é criar histórias envolventes e incorporar palavras específicas quando solicitado." },
         { role: "user", content: prompt }
       ],
-      temperature: 0.7,
+      temperature: 0.1,
       max_tokens: 500,
     })
 
     const content = completion.choices[0].message.content
-    const response = JSON.parse(content)
+    const [scenario, ...options] = content.split('\n').filter(line => line.trim() !== '')
 
-    return NextResponse.json(response)
+    return NextResponse.json({ scenario, options })
   } catch (error) {
     console.error('Erro ao gerar cenário:', error)
-    return NextResponse.json({ error: 'Failed to generate scenario' }, { status: 500 })
+    return NextResponse.json({ error: 'Falha ao gerar cenário' }, { status: 500 })
   }
 }

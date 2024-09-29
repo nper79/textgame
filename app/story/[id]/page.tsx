@@ -1,62 +1,64 @@
-'use client'
+// textgame/app/path_to_your_component/StoryPage.tsx
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'
-import { useSearchParams, useParams } from 'next/navigation'
-import { Input } from "@/components/ui/input"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { ChevronRightIcon } from "lucide-react"
+'use client';
+
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useParams } from 'next/navigation';
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ChevronRightIcon } from 'lucide-react';
+import TranslatableWord from '@/components/TranslatableWord';
 
 interface StoryData {
-  id: string
-  title?: string
-  summary: string
-  options: string[]
+  id: string;
+  title?: string;
+  summary: string;
+  options: string[];
 }
 
 interface StorySegment {
-  text: string
-  choice?: string
+  text: string;
+  choice?: string;
 }
 
-interface TooltipData {
-  word: string
-  translation: string
-  x: number
-  y: number
+interface WordStatus {
+  word: string;
+  lastClickedBlock: number;
+  appearedInLastBlock: boolean;
 }
 
 const StoryPage: React.FC = () => {
-  const params = useParams()
-  const searchParams = useSearchParams()
-  
-  const id = (params.id as string) || 'default'
-  const language = searchParams.get('target') || 'en'
-  const nativeLanguage = searchParams.get('native') || 'en'
-  
-  const [storyData, setStoryData] = useState<StoryData | null>(null)
-  const [storySegments, setStorySegments] = useState<StorySegment[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [customAction, setCustomAction] = useState('')
-  const [error, setError] = useState<string | null>(null)
-  const [translationsCache, setTranslationsCache] = useState<{ [key: string]: string }>({})
-  const [tooltip, setTooltip] = useState<TooltipData | null>(null)
+  const params = useParams();
+  const searchParams = useSearchParams();
 
-  const debugInfoRef = useRef<string>('')
-  const initialFetchRef = useRef(false)
+  const id = (params.id as string) || 'default';
+  const language = searchParams.get('target') || 'en';
+  const nativeLanguage = searchParams.get('native') || 'en';
+
+  const [storyData, setStoryData] = useState<StoryData | null>(null);
+  const [storySegments, setStorySegments] = useState<StorySegment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [customAction, setCustomAction] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [clickedWords, setClickedWords] = useState<WordStatus[]>([]);
+  const [currentBlock, setCurrentBlock] = useState<number>(0);
+
+  const debugInfoRef = useRef<string>('');
+  const initialFetchRef = useRef(false);
 
   const addDebugInfo = useCallback((info: string) => {
-    debugInfoRef.current += '\n' + info
-    console.log(info)
-  }, [])
+    debugInfoRef.current += '\n' + info;
+    console.log(info);
+  }, []);
 
   const fetchStory = useCallback(async (choice?: string, previousSummaryParam?: string) => {
-    addDebugInfo('Buscando história com escolha: ' + (choice || 'inicial'))
-    setIsLoading(true)
-    setError(null)
+    addDebugInfo('Buscando história com escolha: ' + (choice || 'inicial'));
+    setIsLoading(true);
+    setError(null);
 
     const previousSummary = previousSummaryParam !== undefined
       ? previousSummaryParam
-      : storySegments.map(segment => segment.text).join('\n\n')
+      : storySegments.map(segment => segment.text).join('\n\n');
 
     try {
       const response = await fetch('/api/story', {
@@ -70,150 +72,117 @@ const StoryPage: React.FC = () => {
           nativeLanguage,
           choice: choice || '',
           previousSummary,
+          clickedWords: clickedWords.map(w => w.word),
         }),
-      })
+      });
 
       if (!response.ok) {
-        throw new Error(`Erro HTTP! status: ${response.status}`)
+        throw new Error(`Erro HTTP! status: ${response.status}`);
       }
 
-      const data = await response.json()
+      const data = await response.json();
 
       // Log detalhado das opções
-      console.log('Opções recebidas da API (raw):', data.options)
-      console.log('Opções após normalização:')
+      console.log('Opções recebidas da API (raw):', data.options);
+      console.log('Opções após normalização:');
       data.options.forEach((option: string, index: number) => {
-        console.log(`Opção ${index + 1}:`, option)
-        console.log(`Opção ${index + 1} (normalizada):`, normalizeText(option))
-      })
+        console.log(`Opção ${index + 1}:`, option);
+        console.log(`Opção ${index + 1} (normalizada):`, normalizeText(option));
+      });
 
       if ((storySegments.length === 0 && !data.title) || !data.summary || !Array.isArray(data.options) || data.options.length === 0) {
-        throw new Error('Dados da história incompletos ou inválidos')
+        throw new Error('Dados da história incompletos ou inválidos');
       }
 
-      setStoryData(data)
-      setStorySegments(prev => [...prev, { text: data.summary, choice: choice }])
-      setIsLoading(false)
+      setStoryData(data);
+      setStorySegments(prev => [...prev, { text: data.summary, choice: choice }]);
+      setCurrentBlock(prev => prev + 1);
+      
+      const newBlockWords = new Set(data.summary.toLowerCase().split(/\s+/));
+      
+      setClickedWords(prev => 
+        prev.filter(wordStatus => {
+          // Remove a palavra se apareceu no bloco anterior e não foi clicada
+          if (wordStatus.appearedInLastBlock && wordStatus.lastClickedBlock < currentBlock) {
+            return false;
+          }
+          return true;
+        }).map(wordStatus => ({
+          ...wordStatus,
+          appearedInLastBlock: newBlockWords.has(wordStatus.word.toLowerCase())
+        }))
+      );
+
+      setIsLoading(false);
     } catch (error) {
-      console.error('Erro ao buscar história:', error)
-      setError('Falha ao carregar história. ' + (error as Error).message)
-      setIsLoading(false)
+      console.error('Erro ao buscar história:', error);
+      setError('Falha ao carregar história. ' + (error as Error).message);
+      setIsLoading(false);
     }
-  }, [id, language, nativeLanguage, storySegments, addDebugInfo])
+  }, [id, language, nativeLanguage, storySegments, addDebugInfo, clickedWords, currentBlock]);
 
   useEffect(() => {
     if (!initialFetchRef.current) {
-      initialFetchRef.current = true
-      fetchStory()
+      initialFetchRef.current = true;
+      fetchStory();
     }
-  }, [fetchStory])
+  }, [fetchStory]);
 
   const handleOptionWordClick = (e: React.MouseEvent<HTMLSpanElement>, word: string) => {
     e.stopPropagation(); // Prevents the click on the word from triggering the option selection
-    handleWordClick(word, e);
+    handleWordClick(word);
   };
 
   const handleOptionClick = (option: string) => {
-    if (isLoading) return
-    const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
-    fetchStory(option, updatedPreviousSummary)
-  }
+    if (isLoading) return;
+    const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n');
+    fetchStory(option, updatedPreviousSummary);
+  };
 
   const handleCustomAction = (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
     if (customAction.trim() && !isLoading) {
-      const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n')
-      fetchStory(customAction.trim(), updatedPreviousSummary)
-      setCustomAction('')
+      const updatedPreviousSummary = [...storySegments.map(s => s.text), storyData!.summary].join('\n\n');
+      fetchStory(customAction.trim(), updatedPreviousSummary);
+      setCustomAction('');
     }
-  }
+  };
 
-  const handleWordClick = async (word: string, event: React.MouseEvent) => {
-    event.preventDefault()
-    const cleanWord = word.replace(/[.,!?;:()"]/g, '').toLowerCase()
-
-    if (translationsCache[cleanWord]) {
-      setTooltip({
-        word,
-        translation: translationsCache[cleanWord],
-        x: event.clientX,
-        y: event.clientY,
-      })
-    } else {
-      const translation = await translateWord(cleanWord)
-      if (translation) {
-        setTranslationsCache(prevCache => ({
-          ...prevCache,
-          [cleanWord]: translation,
-        }))
-        setTooltip({
-          word,
-          translation,
-          x: event.clientX,
-          y: event.clientY,
-        })
-      }
-    }
-  }
-
-  const translateWord = async (word: string): Promise<string | null> => {
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          word,
-          source: language,
-          target: nativeLanguage,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.text()
-        console.error('Translation API error:', errorData)
-        return null
-      }
-
-      const data = await response.json()
-      if (data && data.translation) {
-        return data.translation
+  const handleWordClick = useCallback((word: string) => {
+    setClickedWords(prev => {
+      const existingWordIndex = prev.findIndex(w => w.word.toLowerCase() === word.toLowerCase());
+      if (existingWordIndex !== -1) {
+        const updatedWords = [...prev];
+        updatedWords[existingWordIndex] = {
+          ...updatedWords[existingWordIndex],
+          lastClickedBlock: currentBlock,
+          appearedInLastBlock: true,
+        };
+        return updatedWords;
       } else {
-        console.error('Erro de tradução:', data)
-        return null
+        return [...prev, { word, lastClickedBlock: currentBlock, appearedInLastBlock: true }];
       }
-    } catch (error) {
-      console.error('Erro ao traduzir palavra:', error)
-      return null
-    }
-  }
-
-  useEffect(() => {
-    if (tooltip) {
-      const timer = setTimeout(() => setTooltip(null), 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [tooltip])
+    });
+  }, [currentBlock]);
 
   const normalizeText = (text: string) => {
     // Apenas remove espaços em branco extras e faz trim
     return text.trim().replace(/\s+/g, ' ');
-  }
+  };
 
   const renderTranslatableText = (text: string) => {
     return text.split(' ').map((word, idx) => (
       <React.Fragment key={idx}>
-        <span 
-          className="cursor-pointer hover:underline inline-block"
-          onClick={(e) => handleWordClick(word, e)}
-        >
-          {word}
-        </span>
+        <TranslatableWord
+          word={word}
+          sourceLanguage={language}
+          targetLanguage={nativeLanguage}
+          onWordClick={handleWordClick}
+        />
         {' '}
       </React.Fragment>
-    ))
-  }
+    ));
+  };
 
   return (
     <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center p-4" 
@@ -251,10 +220,19 @@ const StoryPage: React.FC = () => {
                 </div>
               )}
 
+              <div className="mb-6">
+                <h2 className="text-xl mb-2 text-white">Palavras clicadas:</h2>
+                <div className="flex flex-wrap gap-2">
+                  {clickedWords.map((wordStatus, index) => (
+                    <span key={index} className="bg-blue-600 px-2 py-1 rounded text-white">{wordStatus.word}</span>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
                 {storyData!.options.map((option, index) => {
-                  const normalizedOption = normalizeText(option)
-                  console.log(`Opção ${index + 1} renderizada:`, normalizedOption)
+                  const normalizedOption = normalizeText(option);
+                  console.log(`Opção ${index + 1} renderizada:`, normalizedOption);
                   return (
                     <div 
                       key={index}
@@ -265,17 +243,17 @@ const StoryPage: React.FC = () => {
                     >
                       {normalizedOption.split(/\s+/).map((word, wordIndex) => (
                         <React.Fragment key={wordIndex}>
-                          <span
-                            className="cursor-pointer hover:underline inline-block"
-                            onClick={(e) => handleOptionWordClick(e, word)}
-                          >
-                            {word}
-                          </span>
-                          {wordIndex < normalizedOption.split(/\s+/).length - 1 && ' '}
+                          <TranslatableWord
+                            word={word}
+                            sourceLanguage={language}
+                            targetLanguage={nativeLanguage}
+                            onWordClick={handleWordClick}
+                          />
+                          {' '}
                         </React.Fragment>
                       ))}
                     </div>
-                  )
+                  );
                 })}
               </div>
 
@@ -294,26 +272,10 @@ const StoryPage: React.FC = () => {
               </form>
             </>
           )}
-          {tooltip && (
-            <div
-              style={{
-                position: 'fixed',
-                top: tooltip.y + 10,
-                left: tooltip.x + 10,
-                backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                color: '#fff',
-                padding: '5px 10px',
-                borderRadius: '4px',
-                zIndex: 1000,
-              }}
-            >
-              {tooltip.translation}
-            </div>
-          )}
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default StoryPage
+export default StoryPage;
