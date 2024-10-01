@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronRightIcon } from 'lucide-react';
 import TranslatableWord from '@/components/TranslatableWord';
-import { getStoryById, Story } from '@/app/config/storyConfig';
+import { getStoryById, Story } from '@/data/storyPrompts';
 import StoryBlock from '@/components/StoryBlock';
 
 interface StoryData {
@@ -42,7 +42,7 @@ const StoryPage: React.FC = () => {
 
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storySegments, setStorySegments] = useState<StorySegment[]>([]);
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const storySegmentsRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [customAction, setCustomAction] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +100,11 @@ const StoryPage: React.FC = () => {
 
       setStoryData(data);
       setBackgroundImage(data.storyBackgroundImage);
-      setStorySegments(prev => [...prev, { text: data.summary, choice: choice }]);
+      setStorySegments(prev => {
+        const newSegments = [...prev, { text: data.summary, choice: choice }];
+        setTimeout(scrollToBottom, 100);
+        return newSegments;
+      });
       setCurrentBlock(prev => prev + 1);
       
       const newBlockWords = new Set(data.summary.toLowerCase().split(/\s+/));
@@ -207,18 +211,14 @@ const StoryPage: React.FC = () => {
     }
   }, [storyData]);
 
-  const scrollToBottom = useCallback(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
+  const scrollToBottom = () => {
+    if (storySegmentsRef.current) {
+      storySegmentsRef.current.scrollTo({
+        top: storySegmentsRef.current.scrollHeight,
+        behavior: 'smooth'
+      });
     }
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [storySegments, scrollToBottom]);
+  };
 
   return (
     <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center p-4" 
@@ -231,8 +231,8 @@ const StoryPage: React.FC = () => {
             <div className="text-white">Loading Adventure, please wait...</div>
           ) : (
             <>
-              <ScrollArea ref={scrollAreaRef} className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
-                <div className="p-4">
+              <ScrollArea className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
+                <div className="p-4" ref={storySegmentsRef}>
                   {storySegments.map((segment, index) => (
                     <div key={index} className="mb-3">
                       {segment.choice && (

@@ -1,24 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getStoryData } from '@/lib/StoryData'
+import { NextResponse } from 'next/server';
+import { getStoryData } from '@/app/lib/StoryData';
 
-export async function POST(request: NextRequest) {
-  console.log('Rota da API chamada')
-  const { id, language, nativeLanguage, choice, previousSummary } = await request.json()
-  console.log(`API chamada com: id=${id}, language=${language}, native=${nativeLanguage}, choice=${choice}`)
-
+export async function POST(request: Request) {
   try {
-    console.log('Chamando função getStoryData')
-    const storyData = await getStoryData(id, language, nativeLanguage, choice, previousSummary)
-    console.log('Dados da história gerados:', storyData)
-    
-    if (!storyData || !storyData.summary || !Array.isArray(storyData.options) || storyData.options.length === 0) {
-      throw new Error('Dados da história incompletos ou inválidos')
-    }
-    
-    console.log('Retornando dados da história')
-    return NextResponse.json(storyData)
+    console.log('Iniciando processamento da requisição POST');
+    const body = await request.json();
+    console.log('Corpo da requisição:', body);
+
+    const { id, language, nativeLanguage, choice, previousSummary } = body;
+
+    console.log(`Chamando getStoryData com id ou slug: ${id}, language: ${language}, nativeLanguage: ${nativeLanguage}`);
+    const storyData = await getStoryData(id, language, nativeLanguage, choice, previousSummary);
+    console.log('Dados da história obtidos:', storyData);
+
+    return NextResponse.json(storyData);
   } catch (error) {
-    console.error('Erro ao gerar história:', error)
-    return NextResponse.json({ error: `Erro ao gerar história: ${error.message}` }, { status: 500 })
+    console.error('Erro ao processar a requisição:', error);
+    return NextResponse.json({ error: 'Erro interno do servidor', details: error.message }, { status: 500 });
   }
 }

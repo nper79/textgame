@@ -1,19 +1,57 @@
+import { getStoryById, stories } from '@/data/storyPrompts';
 import OpenAI from 'openai';
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+const RULES = `
+# RULES
+* Stay in character
+* Story responses should be relatively short—we want a tight feedback loop between you and the user.
+* Always create and present 4 short, distinct options for the user at the end of your response, separated by newlines.
+* Occasionally, you may ask open-ended questions that don't require 4 options.
+* Be concise, witty, and funny.
+* Ensure the game story aligns with the provided game description and tagline.
+* Continue this game interactively with the user.
+* Keep track of any important metrics for this game.
+* Make the game enjoyable but not too easy.
+* Offer the user big decisions with dramatic consequences (both positive and negative).
+* Proceed step by step, and always present four options as the last part of your response.
+* Begin each option with 1, 2, 3, or 4, followed by a period and a space.
+* Add a newline ("\\n") after each option.
+* Present only one set of 4 options per response; never include more than one set.
+* Do not include anything after the options.
+* Avoid phrases like "What do you want to do?" when presenting options.
+
+# EXAMPLE FORMAT
+Interactive story goes here.
+
+1. Option 1.\\n
+2. Option 2.\\n
+3. Option 3.\\n
+4. Option 4.\\n
+
+Please follow these instructions carefully to generate responses with the desired format for GPT-3.5.
+`;
+
 export async function getStoryData(
-  id: string,
+  idOrSlug: string,
   language: string,
   nativeLanguage: string,
   previousChoice?: string,
   previousSummary?: string
 ) {
-  console.log(
-    `Iniciando geração de história para id: ${id}, idioma: ${language}, idioma nativo: ${nativeLanguage}, escolha anterior: ${previousChoice}`
-  );
+  console.log(`getStoryData chamado com id ou slug: ${idOrSlug}, language: ${language}, nativeLanguage: ${nativeLanguage}`);
+  console.log('Todas as histórias disponíveis:', stories.map(p => ({ id: p.id, slug: p.slug, title: p.title })));
+
+  const storyPrompt = getStoryById(idOrSlug);
+  if (!storyPrompt) {
+    console.error(`História não encontrada para o id ou slug: ${idOrSlug}`);
+    throw new Error(`História não encontrada para o id ou slug: ${idOrSlug}`);
+  }
+
+  console.log('História encontrada:', { id: storyPrompt.id, slug: storyPrompt.slug, title: storyPrompt.title });
 
   const languageMap: { [key: string]: string } = {
     en: 'English',
@@ -21,68 +59,73 @@ export async function getStoryData(
     es: 'Spanish',
     fr: 'French',
     pt: 'Portuguese',
-    cs: 'Czech'  // Adicionando o checo aqui
+    cs: 'Czech'
   };
 
   const mappedLanguage = languageMap[language] || 'English';
 
-  let storyPrompt = '';
+  let promptContent = '';
 
   if (!previousSummary) {
-    storyPrompt = `Gere uma breve história de aventura em ${mappedLanguage}. A história deve ter um título e um resumo curto. IMPORTANTE: A resposta inteira, incluindo o título e o resumo, DEVE ser em ${mappedLanguage}.`;
+    promptContent = `${storyPrompt.initialPrompt} Generate the entire story and options in ${mappedLanguage}. 
+    Provide a short story summary followed by exactly 4 numbered options, each on a new line. 
+    Do not include any additional text after the options. ${RULES}`;
   } else {
-    storyPrompt = `Continue a seguinte história em ${mappedLanguage}, levando em conta a escolha do jogador. A história até agora é:
+    promptContent = `${storyPrompt.continuationPrompt} The story so far (in ${mappedLanguage}):
 
 "${previousSummary}"
 
-O jogador escolheu: "${previousChoice}"
+The player chose (in ${mappedLanguage}): "${previousChoice}"
 
-Continue a história, fornecendo a próxima parte da narrativa. IMPORTANTE: A resposta inteira DEVE ser em ${mappedLanguage}.`;
+Continue the story in ${mappedLanguage}, providing a short summary of the next part followed by exactly 4 numbered options, each on a new line. 
+Do not switch languages. Keep everything in ${mappedLanguage}.
+Do not include any additional text after the options. ${RULES}`;
   }
 
   const storyCompletion = await openai.chat.completions.create({
     model: 'gpt-3.5-turbo',
-    messages: [{ role: 'user', content: storyPrompt }],
+    messages: [{ role: 'user', content: promptContent }],
+    temperature: 0.7, // Ajustando a temperatura para um valor intermediário
   });
 
   const storyContent = storyCompletion.choices[0].message.content;
 
-  let title = '';
-  let summary = '';
+  // Função para detectar o idioma (simplificada, você pode usar uma biblioteca mais robusta se necessário)
+  const detectLanguage = (text: string): string => {
+    const languagePatterns = {
+      es: /[áéíóúñ¿¡]/i,
+      en: /\b(the|and|is|in|to)\b/i,
+      // Adicione padrões para outros idiomas conforme necessário
+    };
 
-  if (!previousSummary) {
-    [title, summary] = storyContent.split('\n\n');
-  } else {
-    title = '';
-    summary = storyContent.trim();
+    for (const [lang, pattern] of Object.entries(languagePatterns)) {
+      if (pattern.test(text)) return lang;
+    }
+    return 'unknown';
+  };
+
+  const detectedLanguage = detectLanguage(storyContent);
+  if (detectedLanguage !== language) {
+    console.warn(`Idioma detectado (${detectedLanguage}) não corresponde ao idioma solicitado (${language}). Regenerando...`);
+    return getStoryData(idOrSlug, language, nativeLanguage, previousChoice, previousSummary);
   }
 
-  const optionsPrompt = `Com base na história até agora em ${mappedLanguage}:
+  // Separar o conteúdo em resumo e opções
+  const parts = storyContent.split('\n\n');
+  const summary = parts[0].trim();
+  const optionsText = parts[parts.length - 1];
+  
+  // Extrair as opções
+  const options = optionsText.split('\n')
+    .filter(line => /^\d+\./.test(line))
+    .map(line => line.replace(/^\d+\.\s*/, '').trim().replace(/\\n$/, ''));
 
-"${previousSummary ? previousSummary + '\n\n' + summary : summary}"
-
-Gere 4 opções diferentes para o jogador escolher para continuar a história. Cada opção deve ser uma frase curta. IMPORTANTE: Todas as opções DEVEM ser em ${mappedLanguage}. **Não inclua numeração ou marcadores; forneça apenas as opções como frases simples separadas por novas linhas.**`;
-
-  const optionsCompletion = await openai.chat.completions.create({
-    model: 'gpt-3.5-turbo',
-    messages: [{ role: 'user', content: optionsPrompt }],
-  });
-
-  const optionsText = optionsCompletion.choices[0].message.content;
-  const options = optionsText
-    .split('\n')
-    .map((opt) => opt.trim())
-    .filter((opt) => opt !== '')
-    .map((opt) => opt.replace(/^(Opção\s*\d+:?\s*)/, ''));
-
-  console.log(`Geração de história concluída para id: ${id}`);
-  console.log(`Título Gerado: ${title}`);
-  console.log(`Resumo Gerado: ${summary}`);
-  console.log(`Opções Geradas: ${options.join(', ')}`);
+  console.log('Dados da história gerados:', { id: storyPrompt.id, slug: storyPrompt.slug, title: storyPrompt.title, summary, options });
 
   return {
-    id,
-    title: title ? title.replace(/^(Title:|Título:)\s*/i, '') : undefined,
+    id: storyPrompt.id,
+    slug: storyPrompt.slug,
+    title: storyPrompt.title,
     summary,
     options,
   };

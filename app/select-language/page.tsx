@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { getStoryById, Story } from '@/app/config/storyConfig'
+import { getStoryById, Story } from '@/data/storyPrompts'
 
 const languages = [
   { code: 'en', name: 'English', flag: '/circle-flags/flags/gb.svg' },
@@ -41,20 +41,18 @@ function LanguageSelect({ languages, value, onChange, label }) {
         <span className="ml-2">▼</span>
       </div>
       {isOpen && (
-        <div className="absolute z-10 w-full mt-1 bg-white rounded shadow-lg">
+        <div className="absolute z-10 w-full mt-1 bg-gray-700 rounded shadow-lg">
           {languages.map((lang) => (
             <div 
               key={lang.code}
-              className={`flex items-center p-2 hover:bg-gray-100 cursor-pointer ${
-                lang.code === value ? 'bg-gray-200' : ''
-              }`}
+              className="flex items-center p-2 hover:bg-gray-600 cursor-pointer"
               onClick={() => {
                 onChange(lang.code);
                 setIsOpen(false);
               }}
             >
               <Image src={lang.flag} alt="" width={24} height={24} className="mr-2" />
-              <span className="text-black">{lang.name}</span>
+              {lang.name}
             </div>
           ))}
         </div>
@@ -95,21 +93,21 @@ export default function SelectLanguage() {
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent flex flex-col justify-end p-6">
               <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{story.title}</h1>
-              <p className="text-sm text-gray-300"></p>
+              <p className="text-sm text-gray-300">Select your languages to begin the adventure</p>
             </div>
           </div>
           <CardContent className="p-6">
             <ScrollArea className="h-[calc(100vh-8rem)] pr-4">
               <div className="space-y-6 pt-8"> {/* Adicionado pt-8 aqui */}
                 <div>
-                  <h2 className="text-xl font-semibold mb-3 text-blue-400"></h2>
+                  <h2 className="text-xl font-semibold mb-3 text-blue-400">Story Summary</h2>
                   <p className="text-sm text-gray-300 mb-6">
                     {story.selectLanguageDescription}
                   </p>
                 </div>
                 
                 <div>
-                  <h2 className="text-xl font-semibold mb-3 text-blue-400"></h2>
+                  <h2 className="text-xl font-semibold mb-3 text-blue-400">Select Languages</h2>
                   <div className="space-y-4">
                     <LanguageSelect
                       languages={languages}
