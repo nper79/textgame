@@ -2,18 +2,22 @@
 
 'use client';
 
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ChevronRightIcon } from 'lucide-react';
 import TranslatableWord from '@/components/TranslatableWord';
+import { getStoryById, Story } from '@/app/config/storyConfig';
+import StoryBlock from '@/components/StoryBlock';
 
 interface StoryData {
   id: string;
-  title?: string;
+  title: string;
   summary: string;
   options: string[];
+  storyBackgroundImage: string;
 }
 
 interface StorySegment {
@@ -27,6 +31,7 @@ interface WordStatus {
   appearedInLastBlock: boolean;
 }
 
+
 const StoryPage: React.FC = () => {
   const params = useParams();
   const searchParams = useSearchParams();
@@ -37,6 +42,7 @@ const StoryPage: React.FC = () => {
 
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storySegments, setStorySegments] = useState<StorySegment[]>([]);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [customAction, setCustomAction] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -51,10 +57,13 @@ const StoryPage: React.FC = () => {
     console.log(info);
   }, []);
 
+
   const fetchStory = useCallback(async (choice?: string, previousSummaryParam?: string) => {
     addDebugInfo('Buscando história com escolha: ' + (choice || 'inicial'));
     setIsLoading(true);
     setError(null);
+
+    const storyConfig = getStoryById(id);
 
     const previousSummary = previousSummaryParam !== undefined
       ? previousSummaryParam
@@ -82,19 +91,15 @@ const StoryPage: React.FC = () => {
 
       const data = await response.json();
 
-      // Log detalhado das opções
-      console.log('Opções recebidas da API (raw):', data.options);
-      console.log('Opções após normalização:');
-      data.options.forEach((option: string, index: number) => {
-        console.log(`Opção ${index + 1}:`, option);
-        console.log(`Opção ${index + 1} (normalizada):`, normalizeText(option));
-      });
+      // Adicione a imagem de fundo aos dados da história
+      data.storyBackgroundImage = storyConfig?.storyBackgroundImage || '';
 
       if ((storySegments.length === 0 && !data.title) || !data.summary || !Array.isArray(data.options) || data.options.length === 0) {
         throw new Error('Dados da história incompletos ou inválidos');
       }
 
       setStoryData(data);
+      setBackgroundImage(data.storyBackgroundImage);
       setStorySegments(prev => [...prev, { text: data.summary, choice: choice }]);
       setCurrentBlock(prev => prev + 1);
       
@@ -170,6 +175,7 @@ const StoryPage: React.FC = () => {
     return text.trim().replace(/\s+/g, ' ');
   };
 
+
   const renderTranslatableText = (text: string) => {
     return text.split(' ').map((word, idx) => (
       <React.Fragment key={idx}>
@@ -184,6 +190,36 @@ const StoryPage: React.FC = () => {
     ));
   };
 
+  const [backgroundImage, setBackgroundImage] = useState('');
+
+  const [storyBlocks, setStoryBlocks] = useState<StorySegment[]>([]);
+  const lastBlockRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (lastBlockRef.current) {
+      lastBlockRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+  }, [storyBlocks]);
+
+  useEffect(() => {
+    if (storyData) {
+      setStoryBlocks(prev => [...prev, { text: storyData.summary, choice: '' }]);
+    }
+  }, [storyData]);
+
+  const scrollToBottom = useCallback(() => {
+    if (scrollAreaRef.current) {
+      const scrollElement = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [storySegments, scrollToBottom]);
+
   return (
     <div className="min-h-screen w-full bg-cover bg-center bg-no-repeat flex items-center justify-center p-4" 
          style={{backgroundImage: "url('https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-Omgktnq0WE63kht5XLDg36IDNAvNQN.png')"}}>
@@ -195,7 +231,7 @@ const StoryPage: React.FC = () => {
             <div className="text-white">Loading Adventure, please wait...</div>
           ) : (
             <>
-              <ScrollArea className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
+              <ScrollArea ref={scrollAreaRef} className="h-[300px] w-full rounded mb-6 overflow-hidden bg-gray-800/80">
                 <div className="p-4">
                   {storySegments.map((segment, index) => (
                     <div key={index} className="mb-3">
@@ -277,5 +313,6 @@ const StoryPage: React.FC = () => {
     </div>
   );
 };
+
 
 export default StoryPage;

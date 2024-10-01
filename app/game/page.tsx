@@ -81,6 +81,13 @@ export default function Game() {
     });
   };
 
+  useEffect(() => {
+    const storyConfig = getStoryById(id);
+    if (storyConfig) {
+      setBackgroundImage(storyConfig.storyBackgroundImage);
+    }
+  }, [id]);
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-4">
       <div className="max-w-2xl mx-auto">
